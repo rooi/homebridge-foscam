@@ -49,6 +49,7 @@ module.exports = function(homebridge) {
                 this.camera.getDevState()
                 .then(function (state) {
                       this.log.debug("received camera device state");
+                      this.motionState = state;
                       if(this.motionService) {
                           var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
                           this.log.debug("setting motionDetectAlarm to: " + state.motionDetectAlarm == 2);
@@ -67,8 +68,7 @@ module.exports = function(homebridge) {
         getCurrentMotionSensorState: function(callback) {
             // Periodic update sets the state. Simply get it from there
             var motionDetected = false;
-            var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
-            if(charM) motionDetected = charM.getValue();
+            if(this.motionState) motionDetected = this.motionState.motionDetectAlarm == 2;
             callback(null,motionDetected);
         },
 
@@ -86,8 +86,9 @@ module.exports = function(homebridge) {
               .setCharacteristic(Characteristic.SerialNumber, this.sn);
 
             this.motionService = new Service.MotionSensor();
-            this.motionService.getCharacteristic(Characteristic.MotionDetected)
-            .on('get', this.getCurrentMotionSensorState.bind(this));
+            this.motionService
+                .getCharacteristic(Characteristic.MotionDetected)
+                .on('get', this.getCurrentMotionSensorState.bind(this));
             
             setInterval(this.periodicUpdate.bind(this), this.cache_timeout * 1000);
 
