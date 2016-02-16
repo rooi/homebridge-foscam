@@ -48,12 +48,13 @@ module.exports = function(homebridge) {
                 
                 this.camera.getDevState()
                 .then(function (state) {
-                      this.log.debug("received camera device state");
+                      if(state.motionDetectAlarm == 2) this.log("Motion detected");
                       this.motionState = state;
                       if(this.motionService) {
                           var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
-                          this.log.debug("setting motionDetectAlarm to: " + state.motionDetectAlarm == 2);
-                          if(charM) charM.setValue(state.motionDetectAlarm == 2);
+                          if(charM) {
+                              charM.setValue(state.motionDetectAlarm == 2);
+                          }
                       }
                       this.updating = false;
                       }.bind(this))
