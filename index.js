@@ -54,6 +54,9 @@ module.exports = function(homebridge) {
                           var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
                           if(charA) charA.setValue(state.motionDetectAlarm > 0);
                       
+                          var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
+                          if(charF) charF.setValue(false);
+                      
                           var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
                           if(charM) charM.setValue(state.motionDetectAlarm == 2);
                       
@@ -61,6 +64,10 @@ module.exports = function(homebridge) {
                       this.updating = false;
                       }.bind(this))
                 .catch(function (err) {
+                       this.deviceState = 0;
+                       var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
+                       if(charF) charF.setValue(true);
+                       
                        this.log(err);
                        this.updating = false;
                        }.bind(this));
@@ -80,6 +87,13 @@ module.exports = function(homebridge) {
             var statusActive = false;
             if(this.deviceState) statusActive = this.deviceState.motionDetectAlarm > 0;
             callback(null,statusActive);
+        },
+        
+        getStatusFault: function(callback) {
+            // Periodic update sets the state. Simply get it from there
+            var statusFault = true;
+            if(this.deviceState) statusFault = this.deviceState.motionDetectAlarm > 0;
+            callback(null,statusFault);
         },
 
 
@@ -103,6 +117,10 @@ module.exports = function(homebridge) {
             this.motionService
                 .getCharacteristic(Characteristic.StatusActive)
                 .on('get', this.getStatusActive.bind(this));
+            
+            this.motionService
+                .getCharacteristic(Characteristic.StatusFault)
+                .on('get', this.getStatusFault.bind(this));
             
             setInterval(this.periodicUpdate.bind(this), this.cache_timeout * 1000);
 
