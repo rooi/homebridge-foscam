@@ -9,14 +9,13 @@
   "license": "ISC",
   "preferGlobal": true,
   "keywords": [
-    "homebridge-foscam"
+    "homebridge-plugin"
   ],
   "engines": {
     "node": ">=0.12.0",
     "homebridge": ">=0.2.5"
   },
   "dependencies": {
-    "foscam-client": "^0.2.2",
-    "debug": "^2.2.0"
+    "foscam-client": "^0.2.2"
   }
 }
