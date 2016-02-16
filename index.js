@@ -49,12 +49,14 @@ module.exports = function(homebridge) {
                 this.camera.getDevState()
                 .then(function (state) {
                       if(state.motionDetectAlarm == 2) this.log("Motion detected");
-                      this.motionState = state;
+                      this.deviceState = state;
                       if(this.motionService) {
+                          var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
+                          if(charA) charA.setValue(state.motionDetectAlarm > 0);
+                      
                           var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
-                          if(charM) {
-                              charM.setValue(state.motionDetectAlarm == 2);
-                          }
+                          if(charM) charM.setValue(state.motionDetectAlarm == 2);
+                      
                       }
                       this.updating = false;
                       }.bind(this))
@@ -69,8 +71,15 @@ module.exports = function(homebridge) {
         getCurrentMotionSensorState: function(callback) {
             // Periodic update sets the state. Simply get it from there
             var motionDetected = false;
-            if(this.motionState) motionDetected = this.motionState.motionDetectAlarm == 2;
+            if(this.deviceState) motionDetected = this.deviceState.motionDetectAlarm == 2;
             callback(null,motionDetected);
+        },
+        
+        getStatusActive: function(callback) {
+            // Periodic update sets the state. Simply get it from there
+            var statusActive = false;
+            if(this.deviceState) statusActive = this.deviceState.motionDetectAlarm > 0;
+            callback(null,statusActive);
         },
 
 
@@ -90,6 +99,10 @@ module.exports = function(homebridge) {
             this.motionService
                 .getCharacteristic(Characteristic.MotionDetected)
                 .on('get', this.getCurrentMotionSensorState.bind(this));
+            
+            this.motionService
+                .getCharacteristic(Characteristic.StatusActive)
+                .on('get', this.getStatusActive.bind(this));
             
             setInterval(this.periodicUpdate.bind(this), this.cache_timeout * 1000);
 
