@@ -51,16 +51,20 @@ module.exports = function(homebridge) {
                       if(state.motionDetectAlarm == 2) this.log("Motion detected");
                       var oldState = this.deviceState;
                       this.deviceState = state;
-                      if(this.motionService && this.deviceState != oldState) {
-                          var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
-                          if(charA) charA.setValue(state.motionDetectAlarm > 0);
+                      if(this.motionService) {
+                          // Check for changes
+                          if((oldState.motionDetectAlarm>0) != (state.motionDetectAlarm>0)) {
+                              var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
+                              if(charA) charA.setValue(state.motionDetectAlarm > 0);
+                          }
                       
                           var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
-                          if(charF) charF.setValue(false);
+                          if(charF && charF.getValue()) charF.setValue(false);
                       
-                          var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
-                          if(charM) charM.setValue(state.motionDetectAlarm == 2);
-                      
+                          if((oldState.motionDetectAlarm==2) != (state.motionDetectAlarm==2)) {
+                              var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
+                              if(charM) charM.setValue(state.motionDetectAlarm == 2);
+                          }
                       }
                       this.updating = false;
                       }.bind(this))
