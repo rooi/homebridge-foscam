@@ -49,8 +49,9 @@ module.exports = function(homebridge) {
                 this.camera.getDevState()
                 .then(function (state) {
                       if(state.motionDetectAlarm == 2) this.log("Motion detected");
+                      var oldState = this.deviceState;
                       this.deviceState = state;
-                      if(this.motionService) {
+                      if(this.motionService && this.deviceState != oldState) {
                           var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
                           if(charA) charA.setValue(state.motionDetectAlarm > 0);
                       
