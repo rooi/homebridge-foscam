@@ -94,6 +94,14 @@ module.exports = function(homebridge) {
             callback(null,statusActive);
         },
         
+        setStatusActive: function(value,callback) {
+            // Periodic update sets the state. Simply get it from there
+            var enable = value ? 1 : 0;
+            var params = {isEnable:enable};
+            if(this.camera) this.camera.setMotionDetectConfig(params);
+            if(callback) callback(null);
+        },
+        
         getStatusFault: function(callback) {
             // Periodic update sets the state. Simply get it from there
             var statusFault = true;
@@ -126,6 +134,11 @@ module.exports = function(homebridge) {
             this.motionService
                 .getCharacteristic(Characteristic.StatusFault)
                 .on('get', this.getStatusFault.bind(this));
+            
+            this.motionService
+                .addCharacteristic(Characteristic.Switch)
+                .on('get', this.getStatusActive.bind(this)
+                .on('set', this.setStatusActive.bind(this));
             
             setInterval(this.periodicUpdate.bind(this), this.cache_timeout * 1000);
 
