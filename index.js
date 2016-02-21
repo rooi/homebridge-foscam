@@ -105,7 +105,7 @@ module.exports = function(homebridge) {
         getStatusFault: function(callback) {
             // Periodic update sets the state. Simply get it from there
             var statusFault = true;
-            if(this.deviceState) statusFault = this.deviceState.motionDetectAlarm > 0;
+            if(this.deviceState) statusFault = 0;// Always 0 for now this.deviceState.motionDetectAlarm > 0;
             callback(null,statusFault);
         },
 
