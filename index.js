@@ -136,7 +136,7 @@ module.exports = function(homebridge) {
                 .on('get', this.getStatusFault.bind(this));
             
             this.motionService
-                .addCharacteristic(Characteristic.Switch)
+                .addCharacteristic(Characteristic.On)
                 .on('get', this.getStatusActive.bind(this))
                 .on('set', this.setStatusActive.bind(this));
             
