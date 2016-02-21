@@ -137,7 +137,7 @@ module.exports = function(homebridge) {
             
             this.motionService
                 .addCharacteristic(Characteristic.Switch)
-                .on('get', this.getStatusActive.bind(this)
+                .on('get', this.getStatusActive.bind(this))
                 .on('set', this.setStatusActive.bind(this));
             
             setInterval(this.periodicUpdate.bind(this), this.cache_timeout * 1000);
