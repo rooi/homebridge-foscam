@@ -51,7 +51,7 @@ module.exports = function(homebridge) {
                       if(state.motionDetectAlarm == 2) this.log("Motion detected");
                       var oldState = this.deviceState;
                       this.deviceState = state;
-                      if(this.motionService) {
+                      if(this.motionService && oldState) {
                           // Check for changes
                           if((oldState.motionDetectAlarm>0) != (state.motionDetectAlarm>0)) {
                               var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
