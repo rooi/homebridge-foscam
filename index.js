@@ -48,10 +48,11 @@ module.exports = function(homebridge) {
                 
                 this.camera.getDevState()
                 .then(function (state) {
-                      if(state.motionDetectAlarm == 2) this.log("Motion detected");
-                      var oldState = this.deviceState;
-                      this.deviceState = state;
-                      if(this.motionService && oldState) {
+                      if(state) {
+                        if(state.motionDetectAlarm == 2) this.log("Motion detected");
+                        var oldState = this.deviceState;
+                        this.deviceState = state;
+                        if(this.motionService && oldState) {
                           // Check for changes
                           if((oldState.motionDetectAlarm>0) != (state.motionDetectAlarm>0)) {
                               var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
@@ -65,6 +66,7 @@ module.exports = function(homebridge) {
                               var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
                               if(charM) charM.setValue(state.motionDetectAlarm == 2);
                           }
+                        }
                       }
                       this.updating = false;
                       }.bind(this))
