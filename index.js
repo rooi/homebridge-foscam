@@ -48,6 +48,7 @@ module.exports = function(homebridge) {
                 
                 this.camera.getDevState()
                 .then(function (state) {
+                      this.updating = false;
                       if(state) {
                         if(state.motionDetectAlarm == 2) this.log("Motion detected");
                         var oldState = this.deviceState;
@@ -67,17 +68,17 @@ module.exports = function(homebridge) {
                               if(charM) charM.setValue(state.motionDetectAlarm == 2);
                           }
                         }
-                      }
-                      this.updating = false;
-                      }.bind(this))
+                    }
+                    else this.log("getDevState return empty result, trying again...")
+                }.bind(this))
                 .catch(function (err) {
+                       this.updating = false;
                        this.deviceState = 0;
                        var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
                        if(charF) charF.setValue(true);
                        
                        this.log(err);
-                       this.updating = false;
-                       }.bind(this));
+                }.bind(this));
             }
         },
         
