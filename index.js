@@ -95,17 +95,17 @@ module.exports = function(homebridge) {
         getStatusActive: function(callback) {
             this.camera.getMotionDetectConfig1()
             .then(function (config) {
+                  this.log("config.isEnable = " config.isEnable);
                   var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
                   if(charA) charA.setValue(config.isEnable>0);
                   callback(null,config.isEnable>0);
                   
             }.bind(this))
             .catch(function (err) {
+                   this.log(err);
                    var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
                    if(charF) charF.setValue(true);
                    callback(null,false);
-                   
-                   this.log(err);
             }.bind(this));
             
         },
