@@ -117,7 +117,7 @@ module.exports = function(homebridge) {
             this.camera.getMotionDetectConfig1()
             .then(function (config) {
                   config.isEnable = enable;
-                  this.camera.setMotionDetectConfig(config)
+                  this.camera.setMotionDetectConfig1(config)
                   if(callback) callback(null);
                   
             }.bind(this))
