@@ -19,7 +19,7 @@ module.exports = function(homebridge) {
       this.host = config["host"];
       this.port = config["port"] || 88;
       this.cache_timeout = 1; // seconds
-      this.updating = false;
+      this.updatingState = false;
         
         if(config["sn"]){
             this.sn = config["sn"];
@@ -43,42 +43,44 @@ module.exports = function(homebridge) {
     FoscamAccessory.prototype = {
     
         periodicUpdate: function() {
-            if(!this.updating && this.camera) {
-                this.updating = true;
-                
-                this.camera.getDevState()
-                .then(function (state) {
-                      this.updating = false;
-                      if(state) {
-                        if(state.motionDetectAlarm == 2) this.log("Motion detected");
-                        var oldState = this.deviceState;
-                        this.deviceState = state;
-                        if(this.motionService && oldState) {
-                          // Check for changes
-                          if((oldState.motionDetectAlarm>0) != (state.motionDetectAlarm>0)) {
-                              var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
-                              if(charA) charA.setValue(state.motionDetectAlarm > 0);
-                          }
-                      
-                          var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
-                          if(charF && charF.getValue()) charF.setValue(false);
-                      
-                          if((oldState.motionDetectAlarm==2) != (state.motionDetectAlarm==2)) {
-                              var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
-                              if(charM) charM.setValue(state.motionDetectAlarm == 2);
-                          }
+            if(this.camera) {
+                if(!this.updatingState) {
+                    this.updatingState = true;
+                    
+                    this.camera.getDevState()
+                    .then(function (state) {
+                          this.updatingState = false;
+                          if(state) {
+                            if(state.motionDetectAlarm == 2) this.log("Motion detected");
+                            var oldState = this.deviceState;
+                            this.deviceState = state;
+                            if(this.motionService && oldState) {
+                              // Check for changes
+                              if((oldState.motionDetectAlarm>0) != (state.motionDetectAlarm>0)) {
+                                  var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
+                                  if(charA) charA.setValue(state.motionDetectAlarm > 0);
+                              }
+                          
+                              var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
+                              if(charF && charF.getValue()) charF.setValue(false);
+                          
+                              if((oldState.motionDetectAlarm==2) != (state.motionDetectAlarm==2)) {
+                                  var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
+                                  if(charM) charM.setValue(state.motionDetectAlarm == 2);
+                              }
+                            }
                         }
-                    }
-                    else this.log("getDevState return empty result, trying again...")
-                }.bind(this))
-                .catch(function (err) {
-                       this.updating = false;
-                       this.deviceState = 0;
-                       var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
-                       if(charF) charF.setValue(true);
-                       
-                       this.log(err);
-                }.bind(this));
+                        else this.log("getDevState return empty result, trying again...")
+                    }.bind(this))
+                    .catch(function (err) {
+                           this.updatingState = false;
+                           this.deviceState = 0;
+                           var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
+                           if(charF) charF.setValue(true);
+                           
+                           this.log(err);
+                    }.bind(this));
+                }
             }
         },
         
@@ -91,18 +93,38 @@ module.exports = function(homebridge) {
         },
         
         getStatusActive: function(callback) {
-            // Periodic update sets the state. Simply get it from there
-            var statusActive = false;
-            if(this.deviceState) statusActive = this.deviceState.motionDetectAlarm > 0;
-            callback(null,statusActive);
+            this.camera.getMotionDetectConfig1()
+            .then(function (config) {
+                  var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
+                  if(charA) charA.setValue(config.isEnable>0);
+                  callback(null,config.isEnable>0);
+                  
+            }.bind(this))
+            .catch(function (err) {
+                   var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
+                   if(charF) charF.setValue(true);
+                   callback(null,false);
+                   
+                   this.log(err);
+            }.bind(this));
+            
         },
         
         setStatusActive: function(value,callback) {
-            // Periodic update sets the state. Simply get it from there
             var enable = value ? 1 : 0;
-            var params = {isEnable:enable};
-            if(this.camera) this.camera.setMotionDetectConfig(params);
-            if(callback) callback(null);
+            
+            // get the old config before changing
+            this.camera.getMotionDetectConfig1()
+            .then(function (config) {
+                  config.isEnable = enable;
+                  this.camera.setMotionDetectConfig(config)
+                  if(callback) callback(null);
+                  
+            }.bind(this))
+            .catch(function (err) {
+                this.log(err);
+                if(callback) callback(err);
+            }.bind(this));
         },
         
         getStatusFault: function(callback) {
