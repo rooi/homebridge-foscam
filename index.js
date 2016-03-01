@@ -95,7 +95,7 @@ module.exports = function(homebridge) {
         getStatusActive: function(callback) {
             this.camera.getMotionDetectConfig1()
             .then(function (config) {
-                  this.log("config.isEnable = " + config.isEnable);
+                  this.log.debug("config.isEnable = " + config.isEnable);
                   var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
                   if(charA) charA.setValue(config.isEnable>0);
                   callback(null,config.isEnable>0);
