@@ -41,7 +41,7 @@ module.exports = function(homebridge) {
 
 		// API detection
 		this.camera.getMotionDetectConfig().then(function (config){
-			if(typeof config.isEnable != "undefined"){
+			if(config.result == 0){
 				this.getConfig = this.camera.getMotionDetectConfig();
 				this.setConfig = function(config){this.camera.setMotionDetectConfig(config);}
 			} else {
