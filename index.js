@@ -38,6 +38,20 @@ module.exports = function(homebridge) {
                                 protocol: 'http', // default
                                 rejectUnauthorizedCerts: true // default
                                 });
+
+		// API detection
+		this.camera.getMotionDetectConfig().then(function (config){
+			if(config.result == 0){
+				this.getConfig = this.camera.getMotionDetectConfig();
+				this.setConfig = function(config){this.camera.setMotionDetectConfig(config);}
+			} else {
+				this.getConfig = this.camera.getMotionDetectConfig1();
+				this.setConfig = function(config){this.camera.setMotionDetectConfig1(config);}
+			}
+		}.bind(this))
+		.catch(function (err){
+			this.log(err);
+		}.bind(this));
     }
 
     FoscamAccessory.prototype = {
@@ -93,8 +107,7 @@ module.exports = function(homebridge) {
         },
         
         getStatusActive: function(callback) {
-            this.camera.getMotionDetectConfig1()
-            .then(function (config) {
+            this.getConfig.then(function (config) {
                   this.log.debug("config.isEnable = " + config.isEnable);
                   var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
                   if(charA) charA.setValue(config.isEnable>0);
@@ -114,10 +127,9 @@ module.exports = function(homebridge) {
             var enable = value ? 1 : 0;
             
             // get the old config before changing
-            this.camera.getMotionDetectConfig1()
-            .then(function (config) {
+            this.getConfig.then(function (config) {
                   config.isEnable = enable;
-                  this.camera.setMotionDetectConfig1(config)
+                  this.setConfig(config);
                   if(callback) callback(null);
                   
             }.bind(this))
