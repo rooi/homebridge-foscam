@@ -201,7 +201,7 @@ module.exports = function(homebridge) {
               .setCharacteristic(Characteristic.Model, "C2")
               .setCharacteristic(Characteristic.SerialNumber, this.sn);
 
-            this.motionService = new Service.MotionSensor();
+            this.motionService = new Service.MotionSensor("Motion Detection");
             this.motionService
                 .getCharacteristic(Characteristic.MotionDetected)
                 .on('get', this.getCurrentMotionSensorState.bind(this));
