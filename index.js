@@ -2,6 +2,8 @@ var Service;
 var Characteristic;
 var Foscam = require("foscam-client");
 var crypto = require("crypto");
+var fs = require("fs");
+var mkdirp = require("mkdirp");
 
 module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
@@ -18,6 +20,7 @@ module.exports = function(homebridge) {
       this.password = config["password"];
       this.host = config["host"];
       this.port = config["port"] || 88;
+      this.path = config["path"];
       this.cache_timeout = 1; // seconds
       this.updatingState = false;
         
@@ -51,6 +54,14 @@ module.exports = function(homebridge) {
 		}.bind(this))
 		.catch(function (err){
 			this.log(err);
+		}.bind(this));
+
+		// Create directory for snapshots
+		mkdirp(this.path, function(err){
+			if(err){
+				this.log(err);
+				this.log("Snapshot directory cannot be created.");
+			}
 		}.bind(this));
     }
 
@@ -149,8 +160,17 @@ module.exports = function(homebridge) {
 	snapPicture: function(snap, callback){
 		if(snap){
 			this.camera.snapPicture2().then(function (jpeg){
-				this.log(jpeg);
-				this.log(this.name + " snapped a picture.");
+
+				// Write data as jpeg file to predefined directory
+				var timeStamp = new Date();
+				fs.writeFile(this.path + "/snap_" + timeStamp.valueOf() + ".jpeg", jpeg, function(err){
+					if (err){
+						this.log(err);
+						this.log("Snapshot cannot be saved.");
+					} else {
+						this.log(this.name + " took a snapshot.");
+					}
+				}.bind(this));
 
 				// Set switch back to off after 1s
 				setTimeout(function(){
@@ -198,7 +218,7 @@ module.exports = function(homebridge) {
                 .on('get', this.getStatusActive.bind(this))
                 .on('set', this.setStatusActive.bind(this));
 
-		this.snapService = new Service.Switch("Snap Picture");
+		this.snapService = new Service.Switch("Snapshot");
 		this.snapService.getCharacteristic(Characteristic.On)
 			.on('set', this.snapPicture.bind(this));
 
