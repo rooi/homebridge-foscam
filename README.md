@@ -18,6 +18,7 @@ Configuration sample:
 	"username": "my-username",
 	"password": "bad-password1",
 	"host": "192.168.0.50",
-	"port": "88"
+	"port": "88",
+	"path": "local path to save snapshots"
 }]
 ```
