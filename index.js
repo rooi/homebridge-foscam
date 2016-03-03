@@ -146,6 +146,27 @@ module.exports = function(homebridge) {
             callback(null,statusFault);
         },
 
+	snapPicture: function(snap, callback){
+		if(snap){
+			this.camera.snapPicture2().then(function (jpeg){
+				this.log(jpeg);
+				this.log(this.name + " snapped a picture.");
+
+				// Set switch back to off after 1s
+				setTimeout(function(){
+					this.snapService.setCharacteristic(Characteristic.On, false);
+				}.bind(this), 1000);
+
+				if(callback) callback(null);
+			}.bind(this))
+			.catch(function (err){
+				this.log(err);
+				if(callback) callback(err);
+			}.bind(this));
+		} else {
+			if(callback) callback(null);
+		}
+	},
 
         getServices: function() {
 
@@ -176,10 +197,14 @@ module.exports = function(homebridge) {
                 .addCharacteristic(Characteristic.On)
                 .on('get', this.getStatusActive.bind(this))
                 .on('set', this.setStatusActive.bind(this));
-            
+
+		this.snapService = new Service.Switch("Snap Picture");
+		this.snapService.getCharacteristic(Characteristic.On)
+			.on('set', this.snapPicture.bind(this));
+
             setInterval(this.periodicUpdate.bind(this), this.cache_timeout * 1000);
 
-            return [informationService, this.motionService];
+            return [informationService, this.motionService, this.snapService];
       }
     }
 };
