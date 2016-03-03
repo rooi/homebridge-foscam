@@ -55,14 +55,6 @@ module.exports = function(homebridge) {
 		.catch(function (err){
 			this.log(err);
 		}.bind(this));
-
-		// Create directory for snapshots
-		mkdirp(this.path, function(err){
-			if(err){
-				this.log(err);
-				this.log("Snapshot directory cannot be created.");
-			}
-		}.bind(this));
     }
 
     FoscamAccessory.prototype = {
@@ -161,14 +153,23 @@ module.exports = function(homebridge) {
 		if(snap){
 			this.camera.snapPicture2().then(function (jpeg){
 
-				// Write data as jpeg file to predefined directory
-				var timeStamp = new Date();
-				fs.writeFile(this.path + "/snap_" + timeStamp.valueOf() + ".jpeg", jpeg, function(err){
-					if (err){
+				// Create directory for snapshots
+				mkdirp(this.path, function(err){
+					if(err){
 						this.log(err);
-						this.log("Snapshot cannot be saved.");
+						this.log("Snapshot directory cannot be created.");
 					} else {
-						this.log(this.name + " took a snapshot.");
+
+						// Write data as jpeg file to predefined directory
+						var timeStamp = new Date();
+						fs.writeFile(this.path + "/snap_" + timeStamp.valueOf() + ".jpeg", jpeg, function(err){
+							if (err){
+								this.log(err);
+								this.log("Snapshot cannot be saved.");
+							} else {
+								this.log(this.name + " took a snapshot.");
+							}
+						}.bind(this));
 					}
 				}.bind(this));
 
