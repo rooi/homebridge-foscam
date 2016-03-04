@@ -64,7 +64,6 @@ module.exports = function(homebridge){
         // HomeKit CurrentState: 0 (STAY_ARM), 1 (AWAY_ARM), 2 (NIGHT_ARM), 3 (DISARMED), 4 (ALARM_TRIGGERED)
         // HomeKit TargetState: 0 (STAY_ARM), 1 (AWAY_ARM), 2 (NIGHT_ARM), 3 (DISARMED)
         this.homekitConvertion = [3, 1, 4];		// Convert Foscam motionDetectAlarm/isEnable to HomeKit CurrentState/TargetState
-        this.foscamConvertion = [1, 1, 1, 0];	// Convert HomeKit TargetState to Foscam isEnable
     }
 
     FoscamAccessory.prototype = {
@@ -75,7 +74,7 @@ module.exports = function(homebridge){
                 this.camera.getDevState().then(function(state){
                     this.updatingState = false;
                     if(state){
-                        if(state.motionDetectAlarm == 2) this.log("Motion detected");
+                        if(state.motionDetectAlarm == 2) this.log(this.name + " motion detected!");
 
                         // Saving previous state to check for changes
                         var oldState = this.deviceState;
@@ -94,7 +93,7 @@ module.exports = function(homebridge){
                                 this.securityService.setCharacteristic(Characteristic.SecuritySystemCurrentState, currentState);
                             }
                         }
-                    } else this.log(this.name + " getDevState return empty result, trying again...")
+                    } else this.log(this.name + " getDevState return empty result, trying again...");
                 }.bind(this))
                 .catch(function(err){
                     this.updatingState = false;
@@ -107,7 +106,7 @@ module.exports = function(homebridge){
             }
         },
         
-        // Handles the request to get the current state.
+        // Handles the request to get the current state
         getCurrentState: function(callback){
             // Periodic update sets the state. Simply get it from there
 
@@ -118,7 +117,7 @@ module.exports = function(homebridge){
 
                 // Convert motionDetectAlarm to CurrentState
                 currentState = this.homekitConvertion[this.deviceState.motionDetectAlarm];
-                this.log(this.name + " motion detection is " + (currentState < 3 ? "enabled." : "disabled."));
+                this.log(this.name + " motion detection is " + (currentState != 3 ? "enabled." : "disabled."));
                 if(currentState == 4) this.log(this.name + " motion detected!");
             }
             callback(null, currentState);
@@ -126,28 +125,24 @@ module.exports = function(homebridge){
 
         // Handles the request to get the target state
         getTargetState: function(callback){
-            this.getConfig.then(function(config){
+           // Periodic update sets the state. Simply get it from there
 
-                // Convert isEnable to TargetState
-                var targetState = this.homekitConvertion[config.isEnable];
-                callback(null, targetState);
-            }.bind(this))
-            .catch(function(err){
+            // Default target state to DISARMED (Failsafe)
+            var targetState = 3;
 
-                // Set status fault to 1 in case of error
-                this.securityService.setCharacteristic(Characteristic.StatusFault, true);
-                this.log(err);
+            if(this.deviceState){
 
-                // Return TargetState as DISARMED in case of error
-                callback(null, 3);
-            }.bind(this));
+                // Convert motionDetectAlarm to TargetState
+                targetState = this.deviceState.motionDetectAlarm > 0 ? 1 : 3;
+            }
+            callback(null, targetState);
         },
 
         // Handles the request to set the target state
-        setTargetState: function(value,callback){
+        setTargetState: function(value, callback){
 
             // Convert TargetState to isEnable
-            var enable = this.foscamConvertion[value];
+            var enable = value < 3 ? 1 : 0;
 
             // Get current config
             this.getConfig.then(function(config){
@@ -181,6 +176,7 @@ module.exports = function(homebridge){
             callback(null, statusFault);
         },
 
+        // Handles the request to take snapshot
         snapPicture: function(snapshot, callback){
             if(snapshot){
                 this.camera.snapPicture2().then(function(jpeg){
@@ -210,14 +206,14 @@ module.exports = function(homebridge){
                         this.snapService.setCharacteristic(Characteristic.On, false);
                     }.bind(this), 1000);
 
-                    if(callback) callback(null);
+                    callback(null);
                 }.bind(this))
                 .catch(function(err){
                     this.log(err);
-                    if(callback) callback(err);
+                    callback(err);
                 }.bind(this));
             } else {
-                if(callback) callback(null);
+                callback(null);
             }
         },
 
@@ -226,6 +222,7 @@ module.exports = function(homebridge){
             this.log(this.name + " identify requested!");
             callback();
         },
+
         getServices: function(){
 
             // you can OPTIONALLY create an information service if you wish to override
@@ -255,7 +252,7 @@ module.exports = function(homebridge){
 
             setInterval(this.periodicUpdate.bind(this), this.cache_timeout * 1000);
 
-            return [informationService, this.motionService, this.snapService];
+            return [informationService, this.securityService, this.snapService];
         }
     }
 };
