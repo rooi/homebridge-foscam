@@ -20,6 +20,9 @@ module.exports = function(homebridge){
         this.password = config["password"];
         this.host = config["host"];
         this.port = config["port"] || 88;
+        this.stay = parseInt(config["stay"]) & 3 || 0;
+        this.away = parseInt(config["away"]) & 3 || 0;
+        this.night = parseInt(config["night"]) & 3|| 0;
         this.path = config["path"];
         this.cache_timeout = 1; // seconds
         this.updatingState = false;
@@ -59,11 +62,9 @@ module.exports = function(homebridge){
         }.bind(this));
 
         // Definition Mapping
-        // Foscam motionDetectAlarm: 0 (Disabled), 1 (No Alarm), 2 (Detect Alarm)
-        // Foscam isEnable: 0 (Disabled), 1 (Enabled)
-        // HomeKit CurrentState: 0 (STAY_ARM), 1 (AWAY_ARM), 2 (NIGHT_ARM), 3 (DISARMED), 4 (ALARM_TRIGGERED)
-        // HomeKit TargetState: 0 (STAY_ARM), 1 (AWAY_ARM), 2 (NIGHT_ARM), 3 (DISARMED)
-        this.homekitConvertion = [3, 1, 4];		// Convert Foscam motionDetectAlarm/isEnable to HomeKit CurrentState/TargetState
+        // HomeKit TargetState: 0 (STAY_ARM), 1 (AWAY_ARM), 2 (NIGHT_ARM), 3 (DISARMED), 4 (ALARM_TRIGGERED)
+        this.convertion = [this.stay, this.away, this.night];
+        this.armState = ["Armed (Stay).", "Armed (Away).", "Armed (Night).", "Disarmed.", "Alarm Triggered."]
     }
 
     FoscamAccessory.prototype = {
@@ -72,32 +73,56 @@ module.exports = function(homebridge){
             if(this.camera && !this.updatingState){
                 this.updatingState = true;
                 this.camera.getDevState().then(function(state){
+                    this.getConfig.then(function(config){
                     this.updatingState = false;
-                    if(state){
-                        if(state.motionDetectAlarm == 2) this.log(this.name + " motion detected!");
+                        if(state && config){
 
-                        // Saving previous state to check for changes
-                        var oldState = this.deviceState;
-                        this.deviceState = state;
+                            // Saving previous state to check for changes
+                            var oldCurrentState = this.currentState;
+                            var oldTargetState = this.targetState;
+                            this.result = state.result;
 
-                        if(this.securityService && oldState){
-
-                            // Status fault is always 0 for successful call
-                            this.securityService.setCharacteristic(Characteristic.StatusFault, false);
-
-                            // Check for changes
-                            if(oldState.motionDetectAlarm != state.motionDetectAlarm){
-
-                                // Convert motionDetectAlarm to CurrentState
-                                var currentState = this.homekitConvertion[state.motionDetectAlarm];
-                                this.securityService.setCharacteristic(Characteristic.SecuritySystemCurrentState, currentState);
+                            // Compute CurrentState and TargetState
+                            if(config.isEnable == 0){
+                                this.currentState = 3;
+                                this.targetState = 3;
+                            } else if(config.isEnable == 1){
+                                if(this.convertion.indexOf(config.linkage & 3) >= 0){
+                                    this.currentState = this.convertion.indexOf(config.linkage & 3);
+                                    this.targetState = this.convertion.indexOf(config.linkage & 3);
+                                } else {
+                                    this.currentState = 3;
+                                    this.targetState = 3;
+                                }
                             }
-                        }
-                    } else this.log(this.name + " getDevState return empty result, trying again...");
+
+                            // Detect for alarm triggered
+                            if(state.motionDetectAlarm == 2){
+                                this.log(this.name + " motion detected!");
+                                this.currentState = 4;
+                            }
+
+                            if(this.securityService && oldCurrentState >= 0 && oldTargetState >= 0){
+
+                                // Status fault is always 0 for successful call
+                                this.securityService.setCharacteristic(Characteristic.StatusFault, false);
+
+                                // Check for changes
+                                if(oldCurrentState != this.currentState || oldTargetState != this.targetState){
+
+                                    // Refresh CurrentState and TargetState
+                                    this.securityService.setCharacteristic(Characteristic.SecuritySystemCurrentState, this.currentState);
+                                    this.securityService.getCharacteristic(Characteristic.SecuritySystemTargetState).getValue();
+                                }
+                            }
+                        } else this.log(this.name + " getDevState return empty result, trying again...");
+                    }.bind(this));
                 }.bind(this))
                 .catch(function(err){
                     this.updatingState = false;
-                    this.deviceState = 0;
+                    this.currentState = -1;
+                    this.targetState = -1;
+                    this.result = -1;
 
                     // Set status fault to 1 in case of error
                     this.securityService.setCharacteristic(Characteristic.StatusFault, true);
@@ -108,34 +133,22 @@ module.exports = function(homebridge){
         
         // Handles the request to get the current state
         getCurrentState: function(callback){
+
             // Periodic update sets the state. Simply get it from there
-
-            // Default current state to DISARMED (Failsafe)
-            var currentState = 3;
-
-            if(this.deviceState){
-
-                // Convert motionDetectAlarm to CurrentState
-                currentState = this.homekitConvertion[this.deviceState.motionDetectAlarm];
-                this.log(this.name + " motion detection is " + (currentState != 3 ? "enabled." : "disabled."));
-                if(currentState == 4) this.log(this.name + " motion detected!");
+            if(this.currentState >= 0){			
+                this.log(this.name + " current state: " + this.armState[this.currentState]);
+                callback(null, this.currentState);
+            } else {
+                callback(null, 3);
             }
-            callback(null, currentState);
         },
 
         // Handles the request to get the target state
         getTargetState: function(callback){
-           // Periodic update sets the state. Simply get it from there
 
-            // Default target state to DISARMED (Failsafe)
-            var targetState = 3;
-
-            if(this.deviceState){
-
-                // Convert motionDetectAlarm to TargetState
-                targetState = this.deviceState.motionDetectAlarm > 0 ? 1 : 3;
-            }
-            callback(null, targetState);
+            // Periodic update sets the state. Simply get it from there
+            if(this.targetState >= 0)	callback(null, this.targetState);
+            else						callback(null, 3);
         },
 
         // Handles the request to set the target state
@@ -145,14 +158,15 @@ module.exports = function(homebridge){
             var enable = value < 3 ? 1 : 0;
 
             // Get current config
-            this.getConfig.then(function(config){
+            this.getConfig.then(function(newConfig){
 
                 // Change isEnable to requested state
-                config.isEnable = enable;
+                newConfig.isEnable = enable;
+                if(enable) newConfig.linkage = this.convertion[value] | 12;
 
                 // Update config with requested state
-                this.setConfig(config);
-                this.log(this.name + " motion detection is " + (enable ? "enabled." : "disabled."));
+                this.setConfig(newConfig);
+                this.log(this.name + " is " + this.armState[value]);
                 callback(null);
             }.bind(this))
             .catch(function (err){
@@ -166,13 +180,10 @@ module.exports = function(homebridge){
 
         // Handles the request to get the status fault
         getStatusFault: function(callback){
+
             // Periodic update sets the state. Simply get it from there
-
-            // Default status fault to 1 (Failsafe)
-            var statusFault = true;
-
             // result is 0 for successful call
-            if(this.deviceState) statusFault = this.deviceState.result == 0 ? false : true;
+            statusFault = this.result == 0 ? false : true;
             callback(null, statusFault);
         },
 
