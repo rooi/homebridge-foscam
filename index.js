@@ -162,7 +162,10 @@ module.exports = function(homebridge){
 
                 // Change isEnable to requested state
                 newConfig.isEnable = enable;
-                if(enable) newConfig.linkage = this.convertion[value] | 12;
+                if(enable){
+                    currentLinkage = newConfig.linkage;
+                    newConfig.linkage = (this.convertion[value] & 3) | (currentLinkage & 12);
+                }
 
                 // Update config with requested state
                 this.setConfig(newConfig);
