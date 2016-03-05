@@ -19,6 +19,16 @@ Configuration sample:
 	"password": "bad-password1",
 	"host": "192.168.0.50",
 	"port": "88",
+	"stay": "1",
+	"away": "3",
+	"night": "2",
 	"path": "local path to save snapshots"
 }]
 ```
+
+`stay`, `away`, `night` define configuration for different ARMED state.
+
+Support configuration: 0 (Do Nothing), 1 (Ring), 2 (Email), 3 (Ring + Email)
+
+P.S.: Any ARMED state will activate motion detection by default.
+
