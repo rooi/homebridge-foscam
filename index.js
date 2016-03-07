@@ -98,7 +98,7 @@ module.exports = function(homebridge){
 
                             // Detect for alarm triggered
                             if(state.motionDetectAlarm == 2){
-                                this.log(this.name + " motion detected!");
+                                this.log("Motion detected!");
                                 this.currentState = 4;
                             }
 
@@ -115,7 +115,7 @@ module.exports = function(homebridge){
                                     this.securityService.getCharacteristic(Characteristic.SecuritySystemTargetState).getValue();
                                 }
                             }
-                        } else this.log(this.name + " getDevState return empty result, trying again...");
+                        } else this.log("getDevState return empty result, trying again...");
                     }.bind(this));
                 }.bind(this))
                 .catch(function(err){
@@ -136,7 +136,7 @@ module.exports = function(homebridge){
 
             // Periodic update sets the state. Simply get it from there
             if(this.currentState >= 0){			
-                this.log(this.name + " current state: " + this.armState[this.currentState]);
+                this.log("Current state: " + this.armState[this.currentState]);
                 callback(null, this.currentState);
             } else {
                 callback(null, 3);
@@ -169,7 +169,7 @@ module.exports = function(homebridge){
 
                 // Update config with requested state
                 this.setConfig(newConfig);
-                this.log(this.name + " is " + this.armState[value]);
+                this.log(this.armState[value]);
                 callback(null);
             }.bind(this))
             .catch(function (err){
@@ -209,7 +209,7 @@ module.exports = function(homebridge){
                                     this.log(err);
                                     this.log("Snapshot cannot be saved.");
                                 } else {
-                                    this.log(this.name + " took a snapshot.");
+                                    this.log("Took a snapshot.");
                                 }
                             }.bind(this));
                         }
@@ -233,7 +233,7 @@ module.exports = function(homebridge){
 
         // Handles the identify request
         identify: function(callback){
-            this.log(this.name + " identify requested!");
+            this.log("Identify requested!");
             callback();
         },
 
