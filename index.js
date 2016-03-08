@@ -63,7 +63,7 @@ module.exports = function(homebridge){
 
         // Definition Mapping
         // HomeKit TargetState: 0 (STAY_ARM), 1 (AWAY_ARM), 2 (NIGHT_ARM), 3 (DISARMED), 4 (ALARM_TRIGGERED)
-        this.convertion = [this.stay, this.away, this.night];
+        this.conversion = [this.stay, this.away, this.night];
         this.armState = ["Armed (Stay).", "Armed (Away).", "Armed (Night).", "Disarmed.", "Alarm Triggered."]
     }
 
@@ -87,9 +87,9 @@ module.exports = function(homebridge){
                                 this.currentState = 3;
                                 this.targetState = 3;
                             } else if(config.isEnable == 1){
-                                if(this.convertion.indexOf(config.linkage & 3) >= 0){
-                                    this.currentState = this.convertion.indexOf(config.linkage & 3);
-                                    this.targetState = this.convertion.indexOf(config.linkage & 3);
+                                if(this.conversion.indexOf(config.linkage & 3) >= 0){
+                                    this.currentState = this.conversion.indexOf(config.linkage & 3);
+                                    this.targetState = this.conversion.indexOf(config.linkage & 3);
                                 } else {
                                     this.currentState = 3;
                                     this.targetState = 3;
@@ -147,8 +147,8 @@ module.exports = function(homebridge){
         getTargetState: function(callback){
 
             // Periodic update sets the state. Simply get it from there
-            if(this.targetState >= 0)	callback(null, this.targetState);
-            else						callback(null, 3);
+            if(this.targetState >= 0) callback(null, this.targetState);
+            else callback(null, 3);
         },
 
         // Handles the request to set the target state
@@ -164,7 +164,7 @@ module.exports = function(homebridge){
                 newConfig.isEnable = enable;
                 if(enable){
                     currentLinkage = newConfig.linkage;
-                    newConfig.linkage = (this.convertion[value] & 3) | (currentLinkage & 12);
+                    newConfig.linkage = (this.conversion[value] & 3) | (currentLinkage & 12);
                 }
 
                 // Update config with requested state
