@@ -20,9 +20,9 @@ module.exports = function(homebridge){
         this.password = config["password"];
         this.host = config["host"];
         this.port = config["port"] || 88;
-        this.stay = parseInt(config["stay"]) & 3 || 0;
-        this.away = parseInt(config["away"]) & 3 || 0;
-        this.night = parseInt(config["night"]) & 3|| 0;
+        this.stay = parseInt(config["stay"]) || 0;
+        this.away = parseInt(config["away"]) || 0;
+        this.night = parseInt(config["night"]) || 0;
         this.path = config["path"];
         this.cache_timeout = 1; // seconds
         this.updatingState = false;
@@ -87,9 +87,9 @@ module.exports = function(homebridge){
                                 this.currentState = 3;
                                 this.targetState = 3;
                             } else if(config.isEnable == 1){
-                                if(this.conversion.indexOf(config.linkage & 3) >= 0){
-                                    this.currentState = this.conversion.indexOf(config.linkage & 3);
-                                    this.targetState = this.conversion.indexOf(config.linkage & 3);
+                                if(this.conversion.indexOf(config.linkage) >= 0){
+                                    this.currentState = this.conversion.indexOf(config.linkage);
+                                    this.targetState = this.conversion.indexOf(config.linkage);
                                 } else {
                                     this.currentState = 3;
                                     this.targetState = 3;
@@ -162,10 +162,7 @@ module.exports = function(homebridge){
 
                 // Change isEnable to requested state
                 newConfig.isEnable = enable;
-                if(enable){
-                    currentLinkage = newConfig.linkage;
-                    newConfig.linkage = (this.conversion[value] & 3) | (currentLinkage & 12);
-                }
+                if(enable) newConfig.linkage = this.conversion[value];
 
                 // Update config with requested state
                 this.setConfig(newConfig);
