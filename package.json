@@ -16,6 +16,7 @@
     "homebridge": ">=0.2.5"
   },
   "dependencies": {
-    "foscam-client": "git://github.com/rooi/foscam-client.git"
+    "foscam-client": "git://github.com/rooi/foscam-client.git",
+    "mkdirp": "^0.5.1"
   }
 }

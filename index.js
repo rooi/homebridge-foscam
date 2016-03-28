@@ -2,25 +2,32 @@ var Service;
 var Characteristic;
 var Foscam = require("foscam-client");
 var crypto = require("crypto");
+var fs = require("fs");
+var mkdirp = require("mkdirp");
 
-module.exports = function(homebridge) {
+module.exports = function(homebridge){
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
 
     homebridge.registerAccessory("homebridge-foscam", "Foscam", FoscamAccessory);
 
-    function FoscamAccessory(log, config) {
-      this.log = log;
+    function FoscamAccessory(log, config){
+        this.log = log;
 
-      // url info
-      this.name = config["name"];
-      this.username = config["username"];
-      this.password = config["password"];
-      this.host = config["host"];
-      this.port = config["port"] || 88;
-      this.cache_timeout = 1; // seconds
-      this.updatingState = false;
-        
+        // Import from config.json
+        this.name = config["name"];
+        this.username = config["username"];
+        this.password = config["password"];
+        this.host = config["host"];
+        this.port = config["port"] || 88;
+        this.stay = parseInt(config["stay"]) & 3 || 0;
+        this.away = parseInt(config["away"]) & 3 || 0;
+        this.night = parseInt(config["night"]) & 3|| 0;
+        this.path = config["path"];
+        this.cache_timeout = 1; // seconds
+        this.updatingState = false;
+
+        // Generate serial number if not defined in config.json
         if(config["sn"]){
             this.sn = config["sn"];
         } else {
@@ -29,158 +36,238 @@ module.exports = function(homebridge) {
             this.sn = shasum.digest('base64');
             this.log.debug('Computed SN ' + this.sn);
         }
-        
-      this.camera = new Foscam({
-                                username: this.username,
-                                password: this.password,
-                                host: this.host,
-                                port: this.port,
-                                protocol: 'http', // default
-                                rejectUnauthorizedCerts: true // default
-                                });
 
-		// API detection
-		this.camera.getMotionDetectConfig().then(function (config){
-			if(config.result == 0){
-				this.getConfig = this.camera.getMotionDetectConfig();
-				this.setConfig = function(config){this.camera.setMotionDetectConfig(config);}
-			} else {
-				this.getConfig = this.camera.getMotionDetectConfig1();
-				this.setConfig = function(config){this.camera.setMotionDetectConfig1(config);}
-			}
-		}.bind(this))
-		.catch(function (err){
-			this.log(err);
-		}.bind(this));
+        // Setup for foscam-client
+        this.camera = new Foscam({
+            username: this.username,
+            password: this.password,
+            host: this.host,
+            port: this.port,
+            protocol: 'http', // default
+            rejectUnauthorizedCerts: true // default
+        });
+
+        // API detection
+        this.camera.getMotionDetectConfig().then(function(config){
+            if(config.result == 0){
+                this.getConfig = this.camera.getMotionDetectConfig();
+                this.setConfig = function(config){this.camera.setMotionDetectConfig(config);}
+            } else {
+                this.getConfig = this.camera.getMotionDetectConfig1();
+                this.setConfig = function(config){this.camera.setMotionDetectConfig1(config);}
+            }
+        }.bind(this))
+        .catch(function(err){
+                this.log(err);
+        }.bind(this));
+
+        // Definition Mapping
+        // HomeKit TargetState: 0 (STAY_ARM), 1 (AWAY_ARM), 2 (NIGHT_ARM), 3 (DISARMED), 4 (ALARM_TRIGGERED)
+        this.conversion = [this.stay, this.away, this.night];
+        this.armState = ["Armed (Stay).", "Armed (Away).", "Armed (Night).", "Disarmed.", "Alarm Triggered."]
     }
 
     FoscamAccessory.prototype = {
     
-        periodicUpdate: function() {
-            if(this.camera) {
-                if(!this.updatingState) {
-                    this.updatingState = true;
-                    
-                    this.camera.getDevState()
-                    .then(function (state) {
-                          this.updatingState = false;
-                          if(state) {
-                            if(state.motionDetectAlarm == 2) this.log("Motion detected");
-                            var oldState = this.deviceState;
-                            this.deviceState = state;
-                            if(this.motionService && oldState) {
-                              // Check for changes
-                              if((oldState.motionDetectAlarm>0) != (state.motionDetectAlarm>0)) {
-                                  var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
-                                  if(charA) charA.setValue(state.motionDetectAlarm > 0);
-                              }
-                          
-                              var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
-                              if(charF && charF.getValue()) charF.setValue(false);
-                          
-                              if((oldState.motionDetectAlarm==2) != (state.motionDetectAlarm==2)) {
-                                  var charM = this.motionService.getCharacteristic(Characteristic.MotionDetected);
-                                  if(charM) charM.setValue(state.motionDetectAlarm == 2);
-                              }
+        periodicUpdate: function(){
+            if(this.camera && !this.updatingState){
+                this.updatingState = true;
+                this.camera.getDevState().then(function(state){
+                    this.getConfig.then(function(config){
+                    this.updatingState = false;
+                        if(state && config){
+
+                            // Saving previous state to check for changes
+                            var oldCurrentState = this.currentState;
+                            var oldTargetState = this.targetState;
+                            this.result = state.result;
+
+                            // Compute CurrentState and TargetState
+                            if(config.isEnable == 0){
+                                this.currentState = 3;
+                                this.targetState = 3;
+                            } else if(config.isEnable == 1){
+                                if(this.conversion.indexOf(config.linkage & 3) >= 0){
+                                    this.currentState = this.conversion.indexOf(config.linkage & 3);
+                                    this.targetState = this.conversion.indexOf(config.linkage & 3);
+                                } else {
+                                    this.currentState = 3;
+                                    this.targetState = 3;
+                                }
                             }
-                        }
-                        else this.log("getDevState return empty result, trying again...")
-                    }.bind(this))
-                    .catch(function (err) {
-                           this.updatingState = false;
-                           this.deviceState = 0;
-                           var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
-                           if(charF) charF.setValue(true);
-                           
-                           this.log(err);
+
+                            // Detect for alarm triggered
+                            if(state.motionDetectAlarm == 2){
+                                this.log("Motion detected!");
+                                this.currentState = 4;
+                            }
+
+                            if(this.securityService && oldCurrentState >= 0 && oldTargetState >= 0){
+
+                                // Status fault is always 0 for successful call
+                                this.securityService.setCharacteristic(Characteristic.StatusFault, false);
+
+                                // Check for changes
+                                if(oldCurrentState != this.currentState || oldTargetState != this.targetState){
+
+                                    // Refresh CurrentState and TargetState
+                                    this.securityService.setCharacteristic(Characteristic.SecuritySystemCurrentState, this.currentState);
+                                    this.securityService.getCharacteristic(Characteristic.SecuritySystemTargetState).getValue();
+                                }
+                            }
+                        } else this.log("getDevState return empty result, trying again...");
                     }.bind(this));
-                }
+                }.bind(this))
+                .catch(function(err){
+                    this.updatingState = false;
+                    this.currentState = -1;
+                    this.targetState = -1;
+                    this.result = -1;
+
+                    // Set status fault to 1 in case of error
+                    this.securityService.setCharacteristic(Characteristic.StatusFault, true);
+                    this.log(err);
+                }.bind(this));
             }
         },
         
-        // Handles the request to get he current motion sensor state.
-        getCurrentMotionSensorState: function(callback) {
+        // Handles the request to get the current state
+        getCurrentState: function(callback){
+
             // Periodic update sets the state. Simply get it from there
-            var motionDetected = false;
-            if(this.deviceState) motionDetected = this.deviceState.motionDetectAlarm == 2;
-            callback(null,motionDetected);
+            if(this.currentState >= 0){			
+                this.log("Current state: " + this.armState[this.currentState]);
+                callback(null, this.currentState);
+            } else {
+                callback(null, 3);
+            }
         },
-        
-        getStatusActive: function(callback) {
-            this.getConfig.then(function (config) {
-                  this.log.debug("config.isEnable = " + config.isEnable);
-                  var charA = this.motionService.getCharacteristic(Characteristic.StatusActive);
-                  if(charA) charA.setValue(config.isEnable>0);
-                  callback(null,config.isEnable>0);
-                  
-            }.bind(this))
-            .catch(function (err) {
-                   this.log(err);
-                   var charF = this.motionService.getCharacteristic(Characteristic.StatusFault);
-                   if(charF) charF.setValue(true);
-                   callback(null,false);
-            }.bind(this));
-            
+
+        // Handles the request to get the target state
+        getTargetState: function(callback){
+
+            // Periodic update sets the state. Simply get it from there
+            if(this.targetState >= 0) callback(null, this.targetState);
+            else callback(null, 3);
         },
-        
-        setStatusActive: function(value,callback) {
-            var enable = value ? 1 : 0;
-            
-            // get the old config before changing
-            this.getConfig.then(function (config) {
-                  config.isEnable = enable;
-                  this.setConfig(config);
-                  if(callback) callback(null);
-                  
+
+        // Handles the request to set the target state
+        setTargetState: function(value, callback){
+
+            // Convert TargetState to isEnable
+            var enable = value < 3 ? 1 : 0;
+
+            // Get current config
+            this.getConfig.then(function(newConfig){
+
+                // Change isEnable to requested state
+                newConfig.isEnable = enable;
+                if(enable){
+                    currentLinkage = newConfig.linkage;
+                    newConfig.linkage = (this.conversion[value] & 3) | (currentLinkage & 12);
+                }
+
+                // Update config with requested state
+                this.setConfig(newConfig);
+                this.log(this.armState[value]);
+                callback(null);
             }.bind(this))
-            .catch(function (err) {
+            .catch(function (err){
+
+                // Set status fault to 1 in case of error
+                this.securityService.setCharacteristic(Characteristic.StatusFault, true);
                 this.log(err);
-                if(callback) callback(err);
+                callback(err);
             }.bind(this));
         },
-        
-        getStatusFault: function(callback) {
+
+        // Handles the request to get the status fault
+        getStatusFault: function(callback){
+
             // Periodic update sets the state. Simply get it from there
-            var statusFault = true;
-            if(this.deviceState) statusFault = 0;// Always 0 for now this.deviceState.motionDetectAlarm > 0;
-            callback(null,statusFault);
+            // result is 0 for successful call
+            statusFault = this.result == 0 ? false : true;
+            callback(null, statusFault);
         },
 
+        // Handles the request to take snapshot
+        snapPicture: function(snapshot, callback){
+            if(snapshot){
+                this.camera.snapPicture2().then(function(jpeg){
 
-        getServices: function() {
+                    // Create directory for snapshots
+                    mkdirp(this.path, function(err){
+                        if(err){
+                            this.log(err);
+                            this.log("Snapshot directory cannot be created.");
+                        } else {
+
+                            // Write data as jpeg file to predefined directory
+                            var timeStamp = new Date();
+                            fs.writeFile(this.path + "/snap_" + timeStamp.valueOf() + ".jpeg", jpeg, function(err){
+                                if(err){
+                                    this.log(err);
+                                    this.log("Snapshot cannot be saved.");
+                                } else {
+                                    this.log("Took a snapshot.");
+                                }
+                            }.bind(this));
+                        }
+                    }.bind(this));
+
+                    // Set switch back to off after 1s
+                    setTimeout(function(){
+                        this.snapService.setCharacteristic(Characteristic.On, false);
+                    }.bind(this), 1000);
+
+                    callback(null);
+                }.bind(this))
+                .catch(function(err){
+                    this.log(err);
+                    callback(err);
+                }.bind(this));
+            } else {
+                callback(null);
+            }
+        },
+
+        // Handles the identify request
+        identify: function(callback){
+            this.log("Identify requested!");
+            callback();
+        },
+
+        getServices: function(){
 
             // you can OPTIONALLY create an information service if you wish to override
             // the default values for things like serial number, model, etc.
             var informationService = new Service.AccessoryInformation();
-
             informationService
-              .setCharacteristic(Characteristic.Name, this.name)
-              .setCharacteristic(Characteristic.Manufacturer, "Foscam")
-              .setCharacteristic(Characteristic.Model, "C2")
-              .setCharacteristic(Characteristic.SerialNumber, this.sn);
+                .setCharacteristic(Characteristic.Manufacturer, "Foscam Digital Technology LLC")
+                .setCharacteristic(Characteristic.Model, "C2")
+                .setCharacteristic(Characteristic.SerialNumber, this.sn);
 
-            this.motionService = new Service.MotionSensor();
-            this.motionService
-                .getCharacteristic(Characteristic.MotionDetected)
-                .on('get', this.getCurrentMotionSensorState.bind(this));
-            
-            this.motionService
-                .getCharacteristic(Characteristic.StatusActive)
-                .on('get', this.getStatusActive.bind(this));
-            
-            this.motionService
-                .getCharacteristic(Characteristic.StatusFault)
+            // Service for the motion detection
+            this.securityService = new Service.SecuritySystem("Motion Detection");
+            this.securityService.getCharacteristic(Characteristic.StatusFault)
                 .on('get', this.getStatusFault.bind(this));
-            
-            this.motionService
-                .addCharacteristic(Characteristic.On)
-                .on('get', this.getStatusActive.bind(this))
-                .on('set', this.setStatusActive.bind(this));
-            
+
+            this.securityService.getCharacteristic(Characteristic.SecuritySystemCurrentState)
+                .on('get', this.getCurrentState.bind(this));
+
+            this.securityService.getCharacteristic(Characteristic.SecuritySystemTargetState)
+                .on('get', this.getTargetState.bind(this))
+                .on('set', this.setTargetState.bind(this));
+
+            // Service for taking snapshots
+            this.snapService = new Service.Switch("Snapshot");
+            this.snapService.getCharacteristic(Characteristic.On)
+                .on('set', this.snapPicture.bind(this));
+
             setInterval(this.periodicUpdate.bind(this), this.cache_timeout * 1000);
 
-            return [informationService, this.motionService];
-      }
+            return [informationService, this.securityService, this.snapService];
+        }
     }
 };
 
