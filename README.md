@@ -28,7 +28,27 @@ Configuration sample:
 
 `stay`, `away`, `night` define configuration for different ARMED state.
 
-Support configuration: 0 (Do Nothing), 1 (Ring), 2 (Email), 3 (Ring + Email)
+The support configuration depends on your device. The foscam public cgi defines the following:
+
+bit 3 | bit 2 | bit 1 | bit 0
+
+bit 0 = Ring
+bit 1 = Send email
+bit 2 = Snap picture
+bit 3 = Record
+
+The following seems to be valid for the C2 as well (not found in any documentation)
+
+bit 7 | bit 6 | bit 5 | bit 4 | bit 3 | bit 2 | bit 1 | bit 0
+
+bit 0 = Ring
+bit 1 = Send email
+bit 2 = Snap picture
+bit 3 = Record
+bit 7 = Push message to phone
+
+Note: The configuration is defined as int, thus the following are valid, for example:
+0 (Do Nothing), 1 (Ring), 2 (Email), 3 (Ring + Email), 4 (Record), 
+12 (Picture and Record), 13 (Ring, Picture and Record), etc.
 
 P.S.: Any ARMED state will activate motion detection by default.
-
